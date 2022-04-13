@@ -95,3 +95,5 @@ class DeltaUpdater extends EventEmitter {
 
   async quitAndInstall() {}
 }
+
+module.exports = DeltaUpdater;
