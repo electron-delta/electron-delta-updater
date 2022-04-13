@@ -1,2 +1,2 @@
-# electron-delta-updater
+# @electron-delta/updater
 Electron delta updates
