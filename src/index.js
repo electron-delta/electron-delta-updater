@@ -5,6 +5,7 @@ const path = require("path");
 const url = require("url");
 const fs = require("fs-extra");
 const fetch = require("cross-fetch");
+const semver = require("semver");
 const { spawnSync } = require("child_process");
 
 const { downloadFile, niceBytes } = require("./download");
