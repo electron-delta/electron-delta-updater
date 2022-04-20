@@ -1,36 +1,36 @@
-const fs = require("fs-extra");
-const https = require("https");
+const fs = require('fs-extra');
+const https = require('https');
 
-const units = ["bytes", "KB", "MB", "GB", "TB", "PB"];
+const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
 function niceBytes(x) {
-  let l = 0,
-    n = parseInt(x, 10) || 0;
+  let l = 0;
+  let n = parseInt(x, 10) || 0;
   while (n >= 1024 && ++l) {
-    n = n / 1024;
+    n /= 1024;
   }
-  return n.toFixed(n < 10 && l > 0 ? 1 : 0) + " " + units[l];
+  return `${n.toFixed(n < 10 && l > 0 ? 1 : 0)} ${units[l]}`;
 }
 
 function downloadFile(url, filePath, options) {
   const onProgress = options.onProgress || null;
   return new Promise((resolve, reject) => {
     let total = 0;
-    let totalLen = "0 MB";
+    let totalLen = '0 MB';
     let transferred = 0;
     const request = https.get(url, (response) => {
       if (response.statusCode === 200) {
         const file = fs.createWriteStream(filePath);
 
-        file.on("error", (err) => {
+        file.on('error', (err) => {
           request.destroy();
           reject(err);
         });
 
-        response.on("data", (chunk) => {
+        response.on('data', (chunk) => {
           transferred += chunk.length;
-          percentage = parseFloat((transferred * 100) / total).toFixed(2);
-          if (onProgress && typeof onProgress === "function") {
+          const percentage = parseFloat((transferred * 100) / total).toFixed(2);
+          if (onProgress && typeof onProgress === 'function') {
             onProgress({
               transferred: niceBytes(transferred),
               percentage,
@@ -39,16 +39,16 @@ function downloadFile(url, filePath, options) {
           }
         });
 
-        response.on("end", () => {
+        response.on('end', () => {
           file.end();
         });
 
-        response.on("error", (err) => {
+        response.on('error', (err) => {
           file.destroy();
           fs.unlink(filePath, () => reject(err));
         });
 
-        response.pipe(file).once("finish", () => {
+        response.pipe(file).once('finish', () => {
           resolve();
         });
       } else if (response.statusCode === 302 || response.statusCode === 301) {
@@ -58,12 +58,12 @@ function downloadFile(url, filePath, options) {
       }
     });
 
-    request.on("response", (res) => {
-      total = parseInt(res.headers["content-length"], 10);
+    request.on('response', (res) => {
+      total = parseInt(res.headers['content-length'], 10);
       totalLen = niceBytes(total);
     });
 
-    request.on("error", (e) => {
+    request.on('error', (e) => {
       reject(e);
     });
 
