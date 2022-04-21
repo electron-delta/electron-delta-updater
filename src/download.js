@@ -1,5 +1,6 @@
 const fs = require('fs-extra');
 const https = require('https');
+const http = require('http');
 
 const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
@@ -18,7 +19,10 @@ function downloadFile(url, filePath, options) {
     let total = 0;
     let totalLen = '0 MB';
     let transferred = 0;
-    const request = https.get(url, (response) => {
+
+    let httpOrHttps = url.startsWith('https') ? https : http;
+
+    const request = httpOrHttps.get(url, (response) => {
       if (response.statusCode === 200) {
         const file = fs.createWriteStream(filePath);
 

@@ -3,7 +3,6 @@ const electron = require('electron');
 
 const path = require('path');
 const crypto = require('crypto');
-const url = require('url');
 const fs = require('fs-extra');
 const fetch = require('cross-fetch');
 const semver = require('semver');
@@ -71,7 +70,7 @@ class DeltaUpdater extends EventEmitter {
 
   prepareUpdater() {
     if (process.platform === 'win32') {
-      const channel = this.getChannel();
+      const channel = getChannel();
       if (!channel) return;
 
       this.logger.info('[Updater]  CHANNEL = ', channel);
@@ -84,14 +83,7 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  async bootApp() {
-    const { Provider } = require('electron-updater');
-    this.Provider = Provider;
-
-    const latestVersion = await this.Provider.getLatestVersion();
-
-    this.logger.log("[Updater] Latest version: ", latestVersion);
-  }
+  async bootApp() {}
 
   checkForUpdates() {
     this.autoUpdater.checkForUpdates();
@@ -158,10 +150,6 @@ class DeltaUpdater extends EventEmitter {
 
     this.autoUpdater.on('update-available', async (info) => {
       this.logger.info('[Updater] Update available ', info);
-
-      const files = await this.Provider.resolveFiles(info);
-
-      this.logger.info('[Updater] Files: ', files);
 
       // For MacOS, update is downloaded automatically
       if (process.platform === 'darwin') return;
