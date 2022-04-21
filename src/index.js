@@ -89,6 +89,8 @@ class DeltaUpdater extends EventEmitter {
     this.Provider = Provider;
 
     const latestVersion = await this.Provider.getLatestVersion();
+
+    this.logger.log("[Updater] Latest version: ", latestVersion);
   }
 
   checkForUpdates() {
