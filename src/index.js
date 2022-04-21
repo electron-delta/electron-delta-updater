@@ -84,7 +84,12 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  async bootApp() {}
+  async bootApp() {
+    const { Provider } = require('electron-updater');
+    this.Provider = Provider;
+
+    const latestVersion = await this.Provider.getLatestVersion();
+  }
 
   checkForUpdates() {
     this.autoUpdater.checkForUpdates();
@@ -151,6 +156,10 @@ class DeltaUpdater extends EventEmitter {
 
     this.autoUpdater.on('update-available', async (info) => {
       this.logger.info('[Updater] Update available ', info);
+
+      const files = await this.Provider.resolveFiles(info);
+
+      this.logger.info('[Updater] Files: ', files);
 
       // For MacOS, update is downloaded automatically
       if (process.platform === 'darwin') return;
