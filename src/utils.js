@@ -3,17 +3,11 @@ function newBaseUrl(url) {
   if (!result.pathname.endsWith('/')) {
     result.pathname += '/';
   }
-  return result.href;
+  return new URL(result).href;
 }
 
-function newUrlFromBase(pathname, baseUrl, addRandomQueryToAvoidCaching = false) {
+function newUrlFromBase(pathname, baseUrl) {
   const result = new URL(pathname, baseUrl);
-  const { search } = baseUrl;
-  if (search != null && search.length !== 0) {
-    result.search = search;
-  } else if (addRandomQueryToAvoidCaching) {
-    result.search = `noCache=${Date.now().toString(32)}`;
-  }
   return result.href;
 }
 
