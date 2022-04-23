@@ -7,13 +7,16 @@ const fs = require('fs-extra');
 const fetch = require('cross-fetch');
 const semver = require('semver');
 const { spawnSync } = require('child_process');
+const yaml = require('yaml');
 
-const { downloadFile, niceBytes } = require('./download');
+const { downloadFile } = require('./download');
+
+const { getGithubFeedURL } = require('./github-provider');
+const { getGenericFeedURL } = require('./generic-provider');
+const { newBaseUrl, newUrlFromBase } = require('./utils');
 
 const { app, BrowserWindow } = electron;
-
 const oneMinute = 60 * 1000;
-
 const fifteenMinutes = 15 * oneMinute;
 
 const getChannel = () => {
@@ -53,19 +56,36 @@ class DeltaUpdater extends EventEmitter {
     this.autoUpdateInfo = null;
     this.logger = options.logger || console;
     this.autoUpdater = options.autoUpdater || require('electron-updater').autoUpdater;
-    this.hostURL = options.hostURL;
+    this.hostURL = options.hostURL || null;
 
-    this.updateDetailsJSON = path.join(
-      app.getPath('appData'),
-      `../Local/${getAppName()}-updater/update-details.json`,
-    );
-
-    this.deltaHolderPath = path.join(
-      app.getPath('appData'),
-      `../Local/${getAppName()}-updater/deltas`,
-    );
+    this.setConfigPath();
     this.prepareUpdater();
-    this.attachListeners();
+  }
+
+  setConfigPath() {
+    const updateConfigPath = path.join(process.resourcesPath, 'app-update.yml');
+    this.updateConfig = yaml.parse(fs.readFileSync(updateConfigPath, 'utf8'));
+  }
+
+  async guessHostURL() {
+    let hostURL = null;
+    switch (this.updateConfig.provider) {
+      case 'github':
+        hostURL = await getGithubFeedURL(this.updateConfig);
+        break;
+      case 'generic':
+        hostURL = await getGenericFeedURL(this.updateConfig);
+        break;
+      default:
+        hostURL = await this.computeHostURL();
+    }
+    hostURL = newBaseUrl(hostURL);
+    return hostURL;
+  }
+
+  async computeHostURL() {
+    const provider = await this.autoUpdater.clientPromise;
+    return provider.baseUrl.href;
   }
 
   prepareUpdater() {
@@ -80,10 +100,18 @@ class DeltaUpdater extends EventEmitter {
       this.autoUpdater.autoDownload = false;
       this.autoUpdater.autoInstallOnAppQuit = false;
       this.autoUpdater.logger = this.logger;
+
+      this.updateDetailsJSON = path.join(
+        app.getPath('appData'),
+        `../Local/${this.updateConfig.updaterCacheDirName}/update-details.json`,
+      );
+
+      this.deltaHolderPath = path.join(
+        app.getPath('appData'),
+        `../Local/${this.updateConfig.updaterCacheDirName}/deltas`,
+      );
     }
   }
-
-  async bootApp() {}
 
   checkForUpdates() {
     this.autoUpdater.checkForUpdates();
@@ -136,21 +164,29 @@ class DeltaUpdater extends EventEmitter {
     return data;
   }
 
+  async setFeedURL(feedURL) {
+    try {
+      this.logger.log('[Updater] Setting Feed URL for native updater: ', feedURL);
+      await this.autoUpdater.setFeedURL(feedURL);
+    } catch (e) {
+      this.logger.error('[Updater] FeedURL set error ', e);
+    }
+  }
+
   attachListeners() {
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
     this.logger.log('[Updater] Attaching listeners');
 
-    this.autoUpdater.setFeedURL(this.hostURL);
-
     this.autoUpdater.on('error', (error) => {
       this.logger.error('[Updater] Error: ', error);
+      this.emit('error', error);
     });
 
     this.autoUpdater.on('update-available', async (info) => {
       this.logger.info('[Updater] Update available ', info);
-
+      this.emit('update-available', info);
       // For MacOS, update is downloaded automatically
       if (process.platform === 'darwin') return;
 
@@ -216,8 +252,20 @@ class DeltaUpdater extends EventEmitter {
     }, 0);
   }
 
-  getDeltaURL({ appVersion, version, channel }) {
-    return `${this.hostURL}/${getAppName()}-${appVersion}-to-${getAppName()}-${version}-delta.exe`;
+  async boot() {
+    this.logger.info('[Updater] Booting');
+    if (!this.hostURL) {
+      this.hostURL = await this.guessHostURL();
+    }
+    this.attachListeners();
+  }
+
+  getDeltaURL({ deltaPath }) {
+    return newUrlFromBase(this.hostURL, deltaPath);
+  }
+
+  getDeltaJSONUrl() {
+    return newUrlFromBase(this.hostURL, 'delta.json');
   }
 
   async doSmartDownload({ version, releaseDate }) {
@@ -236,24 +284,43 @@ class DeltaUpdater extends EventEmitter {
     channel = channel === 'latest' ? 'stable' : channel;
 
     const appVersion = app.getVersion();
-    const deltaURL = this.getDeltaURL({ appVersion, version, channel });
-    this.logger.info('[Updater] Delta URL ', deltaURL);
-    const deltaSHA256URL = `${deltaURL}.sha256`;
 
-    let shaVal = null;
-
+    const deltaJSONUrl = this.getDeltaJSONUrl();
+    let deltaJSON = null;
     try {
-      const response = await fetch(deltaSHA256URL);
+      const response = await fetch(deltaJSONUrl);
       if (response.status !== 200) {
         this.logger.error(
-          `[Updater] Error fetching ${deltaSHA256URL}: ${response.status}`,
+          `[Updater] Error fetching ${deltaJSONUrl}: ${response.status}`,
         );
       } else {
-        shaVal = await response.text();
+        deltaJSON = await response.json();
       }
     } catch (err) {
-      this.logger.error('Fetch failed ', deltaSHA256URL);
+      this.logger.error('Fetch failed ', deltaJSONUrl);
     }
+
+    if (!deltaJSON) {
+      this.logger.error('[Updater] No delta found');
+      this.autoUpdater.downloadUpdate();
+      return;
+    }
+    let deltaJSONParsed;
+
+    try {
+      deltaJSONParsed = JSON.parse(deltaJSON);
+    } catch (err) {
+      this.logger.error('[Updater] Error parsing delta JSON');
+      this.autoUpdater.downloadUpdate();
+      return;
+    }
+
+    const deltaDetails = deltaJSONParsed[appVersion];
+
+    const deltaURL = this.getDeltaURL({ deltaPath: deltaDetails.path });
+    this.logger.info('[Updater] Delta URL ', deltaURL);
+
+    const shaVal = deltaJSONParsed.sha256;
 
     if (!shaVal) {
       this.logger.info(
@@ -263,10 +330,7 @@ class DeltaUpdater extends EventEmitter {
       return;
     }
 
-    const deltaPath = path.join(
-      this.deltaHolderPath,
-      `${getAppName()}-${appVersion}-to-${getAppName()}-${version}.exe`,
-    );
+    const deltaPath = path.join(this.deltaHolderPath, deltaDetails.path);
 
     if (fs.existsSync(deltaPath) && isSHACorrect(deltaPath, shaVal)) {
     // cached downloaded file is good to go

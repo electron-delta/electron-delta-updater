@@ -20,7 +20,7 @@ function downloadFile(url, filePath, options) {
     let totalLen = '0 MB';
     let transferred = 0;
 
-    let httpOrHttps = url.startsWith('https') ? https : http;
+    const httpOrHttps = url.startsWith('https') ? https : http;
 
     const request = httpOrHttps.get(url, (response) => {
       if (response.statusCode === 200) {
