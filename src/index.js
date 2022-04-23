@@ -70,6 +70,8 @@ class DeltaUpdater extends EventEmitter {
   }
 
   async guessHostURL() {
+    if (!this.updateConfig) { return null; }
+
     let hostURL = null;
     switch (this.updateConfig.provider) {
       case 'github':
