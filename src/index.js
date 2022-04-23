@@ -339,15 +339,14 @@ class DeltaUpdater extends EventEmitter {
 
     await fs.ensureDir(this.deltaHolderPath);
 
+    const onProgressCb = ({ percentage, transferred, total }) => {
+      this.logger.info(`percentage = ${percentage}%, transferred = ${transferred}`);
+      this.emit('download-progress', { percentage, transferred, total });
+      this.autoUpdater.emit('download-progress', { percentage, transferred, total });
+    };
+
     try {
-      const downloadOptions = {
-        onProgress: ({ percentage, transferred, total }) => {
-          this.logger.info(`percentage = ${percentage}%, transferred = ${transferred}`);
-          this.emit('download-progress', { percentage, transferred, total });
-          this.autoUpdater.emit('download-progress', { percentage, transferred, total });
-        },
-      };
-      await downloadFile(deltaURL, deltaPath, downloadOptions);
+      await downloadFile(deltaURL, deltaPath, onProgressCb);
       const isFileGood = isSHACorrect(deltaPath, shaVal);
       if (!isFileGood) {
         this.logger.info(

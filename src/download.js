@@ -13,8 +13,7 @@ function niceBytes(x) {
   return `${n.toFixed(n < 10 && l > 0 ? 1 : 0)} ${units[l]}`;
 }
 
-function downloadFile(url, filePath, options) {
-  const onProgress = options.onProgress || null;
+function downloadFile(url, filePath, onProgressCb) {
   return new Promise((resolve, reject) => {
     let total = 0;
     let totalLen = '0 MB';
@@ -34,8 +33,8 @@ function downloadFile(url, filePath, options) {
         response.on('data', (chunk) => {
           transferred += chunk.length;
           const percentage = parseFloat((transferred * 100) / total).toFixed(2);
-          if (onProgress && typeof onProgress === 'function') {
-            onProgress({
+          if (onProgressCb && typeof onProgressCb === 'function') {
+            onProgressCb({
               transferred: niceBytes(transferred),
               percentage,
               total: totalLen,
