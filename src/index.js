@@ -58,8 +58,10 @@ class DeltaUpdater extends EventEmitter {
     this.autoUpdater = options.autoUpdater || require('electron-updater').autoUpdater;
     this.hostURL = options.hostURL || null;
 
-    this.setConfigPath();
-    this.prepareUpdater();
+    if (app.isPackaged) {
+      this.setConfigPath();
+      this.prepareUpdater();
+    }
   }
 
   setConfigPath() {
@@ -174,6 +176,7 @@ class DeltaUpdater extends EventEmitter {
   }
 
   attachListeners() {
+    if (!app.isPackaged) return;
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
