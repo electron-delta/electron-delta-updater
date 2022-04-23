@@ -308,22 +308,13 @@ class DeltaUpdater extends EventEmitter {
       this.autoUpdater.downloadUpdate();
       return;
     }
-    let deltaJSONParsed;
 
-    try {
-      deltaJSONParsed = JSON.parse(deltaJSON);
-    } catch (err) {
-      this.logger.error('[Updater] Error parsing delta JSON');
-      this.autoUpdater.downloadUpdate();
-      return;
-    }
-
-    const deltaDetails = deltaJSONParsed[appVersion];
+    const deltaDetails = deltaJSON[appVersion];
 
     const deltaURL = this.getDeltaURL({ deltaPath: deltaDetails.path });
     this.logger.info('[Updater] Delta URL ', deltaURL);
 
-    const shaVal = deltaJSONParsed.sha256;
+    const shaVal = deltaJSON.sha256;
 
     if (!shaVal) {
       this.logger.info(
