@@ -264,11 +264,11 @@ class DeltaUpdater extends EventEmitter {
   }
 
   getDeltaURL({ deltaPath }) {
-    return newUrlFromBase(this.hostURL, deltaPath);
+    return newUrlFromBase(deltaPath, this.hostURL);
   }
 
   getDeltaJSONUrl() {
-    return newUrlFromBase(this.hostURL, 'delta.json');
+    return newUrlFromBase('delta.json', this.hostURL);
   }
 
   async doSmartDownload({ version, releaseDate }) {
