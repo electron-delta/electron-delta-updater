@@ -322,11 +322,11 @@ class DeltaUpdater extends EventEmitter {
   }
 
   async boot() {
+    if (process.platform === 'darwin' || !app.isPackaged) return Promise.resolve();
     this.logger.info('[Updater] Booting');
     if (!this.hostURL) {
       this.hostURL = await this.guessHostURL();
     }
-    if (process.platform === 'darwin') return Promise.resolve();
     const startURL = getStartURL();
     return new Promise((resolve, reject) => {
       this.createSplashWindow();
