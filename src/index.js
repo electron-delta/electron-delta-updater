@@ -7,9 +7,10 @@ const fs = require('fs-extra');
 const fetch = require('cross-fetch');
 const semver = require('semver');
 const { spawnSync } = require('child_process');
+const url = require('url');
 const yaml = require('yaml');
 
-const { downloadFile } = require('./download');
+const { downloadFile, niceBytes } = require('./download');
 
 const { getGithubFeedURL } = require('./github-provider');
 const { getGenericFeedURL } = require('./generic-provider');
@@ -49,6 +50,12 @@ const isSHACorrect = (filePath, correctSHA) => {
     return false;
   }
 };
+
+function getStartURL() {
+  return url
+    .pathToFileURL(path.join(__dirname, 'splash.html'))
+    .toString();
+}
 
 class DeltaUpdater extends EventEmitter {
   constructor(options) {
@@ -177,21 +184,58 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  attachListeners() {
+  createSplashWindow() {
+    this.updaterWindow = new BrowserWindow({
+      width: 350,
+      height: 350,
+      resizable: false,
+      frame: false,
+      show: true,
+      titleBarStyle: 'hidden',
+      backgroundColor: '#f64f59',
+      fullscreenable: false,
+      skipTaskbar: false,
+      center: true,
+      movable: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        disableBlinkFeatures: 'Auxclick',
+        sandbox: true,
+      },
+    });
+  }
+
+  dispatchEvent(eventName, payload) {
+    if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+      this.updaterWindow.webContents.send(eventName, payload);
+    }
+  }
+
+  attachListeners(resolve, reject) {
     if (!app.isPackaged) return;
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
     this.logger.log('[Updater] Attaching listeners');
 
+    this.autoUpdater.on('checking-for-update', () => {
+      this.logger.log('[Updater] Checking for update');
+      this.dispatchEvent('checking-for-update');
+    });
+
     this.autoUpdater.on('error', (error) => {
       this.logger.error('[Updater] Error: ', error);
       this.emit('error', error);
+      this.dispatchEvent('error', error);
+      reject(error);
     });
 
     this.autoUpdater.on('update-available', async (info) => {
       this.logger.info('[Updater] Update available ', info);
       this.emit('update-available', info);
+      this.dispatchEvent('update-available', info);
       // For MacOS, update is downloaded automatically
       if (process.platform === 'darwin') return;
 
@@ -210,6 +254,16 @@ class DeltaUpdater extends EventEmitter {
       }
 
       this.doSmartDownload(info);
+    });
+
+    this.autoUpdater.on('download-progress', (info) => {
+      this.logger.info('[Updater] Downloading info ', info);
+      this.emit('download-progress', info);
+      this.dispatchEvent('download-progress', {
+        percentage: parseFloat(info.percent).toFixed(1),
+        transferred: niceBytes(info.transferred),
+        total: niceBytes(info.total),
+      });
     });
 
     this.logger.info('[Updater] Added on quit listener');
@@ -234,9 +288,19 @@ class DeltaUpdater extends EventEmitter {
       }
     });
 
+    this.autoUpdater.on('update-not-available', () => {
+      this.logger.info('[Updater] Update not available');
+      this.emit('update-not-available');
+      this.dispatchEvent('update-not-available');
+      resolve();
+    });
+
     this.autoUpdater.on('update-downloaded', (info) => {
       this.logger.info('[Updater] Update downloaded ', info);
+      this.emit('update-downloaded', info);
+      this.dispatchEvent('update-downloaded', info);
       this.handleUpdateDownloaded(info);
+      resolve();
     });
   }
 
@@ -262,7 +326,13 @@ class DeltaUpdater extends EventEmitter {
     if (!this.hostURL) {
       this.hostURL = await this.guessHostURL();
     }
-    this.attachListeners();
+    if (process.platform === 'darwin') return Promise.resolve();
+    const startURL = getStartURL();
+    return new Promise((resolve, reject) => {
+      this.createSplashWindow();
+      this.updaterWindow.loadURL(startURL);
+      this.attachListeners(resolve, reject);
+    });
   }
 
   getDeltaURL({ deltaPath }) {
