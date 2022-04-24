@@ -313,6 +313,12 @@ class DeltaUpdater extends EventEmitter {
 
     const deltaDetails = deltaJSON[appVersion];
 
+    if (!deltaDetails) {
+      this.logger.error('[Updater] No delta found for this version ', appVersion);
+      this.autoUpdater.downloadUpdate();
+      return;
+    }
+
     const deltaURL = this.getDeltaURL({ deltaPath: deltaDetails.path });
     this.logger.info('[Updater] Delta URL ', deltaURL);
 
