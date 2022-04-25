@@ -396,7 +396,11 @@ class DeltaUpdater extends EventEmitter {
     const onProgressCb = ({ percentage, transferred, total }) => {
       this.logger.info(`downladed=${percentage}%, transferred = ${transferred} / ${total}`);
       this.emit('download-progress', { percentage, transferred, total });
-      this.autoUpdater.emit('download-progress', { percentage, transferred, total });
+      dispatchEvent(this.updaterWindow, 'download-progress', {
+        percentage: parseFloat(percentage).toFixed(1),
+        transferred: niceBytes(transferred),
+        total: niceBytes(total),
+      });
     };
 
     try {
