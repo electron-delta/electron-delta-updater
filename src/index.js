@@ -338,10 +338,15 @@ class DeltaUpdater extends EventEmitter {
       this.updaterWindow.loadURL(startURL);
       this.attachListeners(resolve, reject);
     }).then(() => {
-      this.updaterWindow.close();
+      setTimeout(() => {
+        this.logger.info('[Updater] Closing splash window');
+        this.updaterWindow.close();
+      }, 300);
     }).catch((err) => {
       this.logger.error('[Updater] Boot error ', err);
-      this.updaterWindow.close();
+      setTimeout(() => {
+        this.updaterWindow.close();
+      }, 300);
     });
   }
 
