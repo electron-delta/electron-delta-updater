@@ -262,7 +262,6 @@ class DeltaUpdater extends EventEmitter {
     });
 
     this.autoUpdater.on('download-progress', (info) => {
-      this.logger.info('[Updater] Downloading info ', info);
       this.emit('download-progress', info);
       this.dispatchEvent('download-progress', {
         percentage: parseFloat(info.percent).toFixed(1),
@@ -428,7 +427,7 @@ class DeltaUpdater extends EventEmitter {
     await fs.ensureDir(this.deltaHolderPath);
 
     const onProgressCb = ({ percentage, transferred, total }) => {
-      this.logger.info(`percentage = ${percentage}%, transferred = ${transferred}`);
+      this.logger.info(`downladed=${percentage}%, transferred = ${transferred} / ${total}`);
       this.emit('download-progress', { percentage, transferred, total });
       this.autoUpdater.emit('download-progress', { percentage, transferred, total });
     };
