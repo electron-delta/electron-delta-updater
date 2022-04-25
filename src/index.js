@@ -29,6 +29,7 @@ const getChannel = () => {
 };
 
 const getAppName = () => app.getName();
+const MAIN_MESSAGE = '@electron-delta/updater:main';
 
 const computeSHA256 = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -203,18 +204,22 @@ class DeltaUpdater extends EventEmitter {
         enableRemoteModule: false,
         disableBlinkFeatures: 'Auxclick',
         sandbox: true,
+        preload: path.join(__dirname, 'preload.js'),
       },
     });
   }
 
   dispatchEvent(eventName, payload) {
     if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
-      this.updaterWindow.webContents.send(eventName, payload);
+      this.updaterWindow.webContents.send(MAIN_MESSAGE, { eventName, payload });
     }
   }
 
   attachListeners(resolve, reject) {
-    if (!app.isPackaged) return;
+    if (!app.isPackaged) {
+      resolve();
+      return;
+    }
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
@@ -322,7 +327,7 @@ class DeltaUpdater extends EventEmitter {
   }
 
   async boot() {
-    if (process.platform === 'darwin' || !app.isPackaged) return Promise.resolve();
+    if (process.platform === 'darwin') return Promise.resolve();
     this.logger.info('[Updater] Booting');
     if (!this.hostURL) {
       this.hostURL = await this.guessHostURL();
@@ -332,6 +337,11 @@ class DeltaUpdater extends EventEmitter {
       this.createSplashWindow();
       this.updaterWindow.loadURL(startURL);
       this.attachListeners(resolve, reject);
+    }).then(() => {
+      this.updaterWindow.close();
+    }).catch((err) => {
+      this.logger.error('[Updater] Boot error ', err);
+      this.updaterWindow.close();
     });
   }
 

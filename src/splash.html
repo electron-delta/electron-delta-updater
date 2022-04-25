@@ -1,65 +1,82 @@
 <!DOCTYPE html>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Delta Updater</title>
   <style>
-      html,
-      body {
-        background: #0c0e13;
-        font-family: "Maison Neue", sans-serif;
-        font-size: 16px;
-        line-height: 24px;
-        color: #bbc9e0;
-      }
+    html,
+    body {
+      background: #0c0e13;
+      font-family: "Maison Neue", sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: #bbc9e0;
+    }
 
-      #container {
-        position: absolute;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        left: 50%;
-        top: 50%;
-        padding: 20px;
-        transform: translate(-50%, -50%);
-      }
-      #status {
-        font-size: 14px;
-        line-height: 24px;
-        margin-bottom: 8px;
-        margin-top: -16px;
-      }
+    #container {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      left: 50%;
+      top: 50%;
+      padding: 20px;
+      transform: translate(-50%, -50%);
+    }
+
+    #status {
+      font-size: 14px;
+      line-height: 24px;
+      margin-bottom: 8px;
+      margin-top: -16px;
+    }
+
   </style>
 </head>
+
 <body style="-webkit-app-region: drag">
   <div id="container">
-    <div id="status">Starting to update...</div>
+    <div id="status">Yo</div>
   </div>
-<script>
-  const ipcRenderer = require('ipc-renderer');
-  const statusDom = document.getElementById("status");
-  ipcRenderer.on('checking-for-update', () => {
-    statusDom.textContent = "Checking for update...";
-  });
-  ipcRenderer.on('update-available', (event, info) => {
-    statusDom.textContent = "Update available. Downloading...";
-  });
-  ipcRenderer.on('update-not-available', (event, info) => {
-    statusDom.textContent = "Starting app...";
-  });
-  ipcRenderer.on('error', (event, error) => {
-    statusDom.textContent = "Something went wrong!";
-  });
-  ipcRenderer.on('download-progress', (event, { percentage, transferred, total }) => {
-    statusDom.textContent = `Downloading... ${percentage}% | ${transferred} / ${total}`;
-  });
-  ipcRenderer.on('update-downloaded', (event, info) => {
-    statusDom.textContent = "Update downloaded. Installing...";
-  });
-</script>
+  <script>
+    const MAIN_MESSAGE = '@electron-delta/updater:main';
+    const statusDom = document.getElementById("status");
+
+    window.addEventListener(MAIN_MESSAGE, (event) => {
+      const data = event.detail;
+      const { eventName, payload } = data;
+
+      switch (eventName) {
+        case 'checking-for-update':
+          statusDom.textContent = "Checking for update...";
+          break;
+        case 'update-available':
+          statusDom.textContent = "Update available. Downloading...";
+          break;
+        case 'update-not-available':
+          statusDom.textContent = "Starting app...";
+          break;
+        case 'error':
+          statusDom.textContent = "Something went wrong!";
+          break;
+        case 'download-progress':
+          const { percentage, transferred, total } = payload;
+          statusDom.textContent = `Downloading... ${percentage}% | ${transferred} / ${total}`;
+          break;
+        case 'update-downloaded':
+          statusDom.textContent = "Update downloaded. Installing...";
+          break;
+        default:
+          statusDom.textContent = "Starting app...";
+      }
+    });
+
+  </script>
 </body>
+
 </html>
