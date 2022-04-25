@@ -333,21 +333,18 @@ class DeltaUpdater extends EventEmitter {
       this.hostURL = await this.guessHostURL();
     }
     const startURL = getStartURL();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       this.createSplashWindow();
       this.updaterWindow.loadURL(startURL);
       this.attachListeners(resolve, reject);
-    }).then(() => {
-      setTimeout(() => {
-        this.logger.info('[Updater] Closing splash window');
-        this.updaterWindow.close();
-      }, 300);
-    }).catch((err) => {
-      this.logger.error('[Updater] Boot error ', err);
+    });
+    await new Promise((resolve) => {
       setTimeout(() => {
         this.updaterWindow.close();
+        resolve();
       }, 300);
     });
+    return Promise.resolve();
   }
 
   getDeltaURL({ deltaPath }) {
