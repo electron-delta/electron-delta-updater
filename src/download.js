@@ -55,7 +55,7 @@ function downloadFile(url, filePath, onProgressCb) {
           resolve();
         });
       } else if (response.statusCode === 302 || response.statusCode === 301) {
-        downloadFile(response.headers.location, filePath).then(() => resolve());
+        downloadFile(response.headers.location, filePath, onProgressCb).then(() => resolve());
       } else {
         reject(new Error(`Network error ${response.statusCode}`));
       }
