@@ -7,7 +7,6 @@ const fs = require('fs-extra');
 const fetch = require('cross-fetch');
 const semver = require('semver');
 const { spawnSync } = require('child_process');
-const url = require('url');
 const yaml = require('yaml');
 
 const { downloadFile, niceBytes } = require('./download');
@@ -15,6 +14,8 @@ const { downloadFile, niceBytes } = require('./download');
 const { getGithubFeedURL } = require('./github-provider');
 const { getGenericFeedURL } = require('./generic-provider');
 const { newBaseUrl, newUrlFromBase } = require('./utils');
+
+const { getStartURL, getWindow, dispatchEvent } = require('./splash');
 
 const { app, BrowserWindow } = electron;
 const oneMinute = 60 * 1000;
@@ -29,7 +30,6 @@ const getChannel = () => {
 };
 
 const getAppName = () => app.getName();
-const MAIN_MESSAGE = '@electron-delta/updater:main';
 
 const computeSHA256 = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -45,18 +45,11 @@ const computeSHA256 = (filePath) => {
 const isSHACorrect = (filePath, correctSHA) => {
   try {
     const sha = computeSHA256(filePath);
-
     return sha === correctSHA;
   } catch (e) {
     return false;
   }
 };
-
-function getStartURL() {
-  return url
-    .pathToFileURL(path.join(__dirname, 'splash.html'))
-    .toString();
-}
 
 class DeltaUpdater extends EventEmitter {
   constructor(options) {
@@ -186,33 +179,7 @@ class DeltaUpdater extends EventEmitter {
   }
 
   createSplashWindow() {
-    this.updaterWindow = new BrowserWindow({
-      width: 350,
-      height: 350,
-      resizable: false,
-      frame: false,
-      show: true,
-      titleBarStyle: 'hidden',
-      backgroundColor: '#f64f59',
-      fullscreenable: false,
-      skipTaskbar: false,
-      center: true,
-      movable: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        enableRemoteModule: false,
-        disableBlinkFeatures: 'Auxclick',
-        sandbox: true,
-        preload: path.join(__dirname, 'preload.js'),
-      },
-    });
-  }
-
-  dispatchEvent(eventName, payload) {
-    if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
-      this.updaterWindow.webContents.send(MAIN_MESSAGE, { eventName, payload });
-    }
+    this.updaterWindow = getWindow();
   }
 
   attachListeners(resolve, reject) {
@@ -227,20 +194,20 @@ class DeltaUpdater extends EventEmitter {
 
     this.autoUpdater.on('checking-for-update', () => {
       this.logger.log('[Updater] Checking for update');
-      this.dispatchEvent('checking-for-update');
+      dispatchEvent(this.updaterWindow, 'checking-for-update');
     });
 
     this.autoUpdater.on('error', (error) => {
       this.logger.error('[Updater] Error: ', error);
       this.emit('error', error);
-      this.dispatchEvent('error', error);
+      dispatchEvent(this.updaterWindow, 'error', error);
       reject(error);
     });
 
     this.autoUpdater.on('update-available', async (info) => {
       this.logger.info('[Updater] Update available ', info);
       this.emit('update-available', info);
-      this.dispatchEvent('update-available', info);
+      dispatchEvent(this.updaterWindow, 'update-available', info);
       // For MacOS, update is downloaded automatically
       if (process.platform === 'darwin') return;
 
@@ -263,7 +230,7 @@ class DeltaUpdater extends EventEmitter {
 
     this.autoUpdater.on('download-progress', (info) => {
       this.emit('download-progress', info);
-      this.dispatchEvent('download-progress', {
+      dispatchEvent(this.updaterWindow, 'download-progress', {
         percentage: parseFloat(info.percent).toFixed(1),
         transferred: niceBytes(info.transferred),
         total: niceBytes(info.total),
@@ -295,14 +262,14 @@ class DeltaUpdater extends EventEmitter {
     this.autoUpdater.on('update-not-available', () => {
       this.logger.info('[Updater] Update not available');
       this.emit('update-not-available');
-      this.dispatchEvent('update-not-available');
+      dispatchEvent(this.updaterWindow, 'update-not-available');
       resolve();
     });
 
     this.autoUpdater.on('update-downloaded', (info) => {
       this.logger.info('[Updater] Update downloaded ', info);
       this.emit('update-downloaded', info);
-      this.dispatchEvent('update-downloaded', info);
+      dispatchEvent(this.updaterWindow, 'update-downloaded', info);
       this.handleUpdateDownloaded(info);
       resolve();
     });
