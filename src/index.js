@@ -434,7 +434,7 @@ class DeltaUpdater extends EventEmitter {
     };
 
     try {
-      await downloadFile(deltaURL, deltaPath, onProgressCb);
+      await downloadFile(deltaURL, deltaPath, onProgressCb.bind(this));
       const isFileGood = isSHACorrect(deltaPath, shaVal);
       if (!isFileGood) {
         this.logger.info(
