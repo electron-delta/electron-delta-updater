@@ -4,7 +4,7 @@
   "description": "True delta updater for windows",
   "main": "src/index.js",
   "scripts": {
-    "test": "node_modules/.bin/electron splash-test/main.js"
+    "test": "electron splash-test/main.js"
   },
   "repository": {
     "type": "git",
