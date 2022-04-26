@@ -99,17 +99,16 @@ class DeltaUpdater extends EventEmitter {
   }
 
   prepareUpdater() {
+    const channel = getChannel();
+    if (!channel) return;
+
+    this.logger.info('[Updater]  CHANNEL = ', channel);
+    this.autoUpdater.channel = channel;
+    this.autoUpdater.logger = this.logger;
     if (process.platform === 'win32') {
-      const channel = getChannel();
-      if (!channel) return;
-
-      this.logger.info('[Updater]  CHANNEL = ', channel);
-
-      this.autoUpdater.channel = channel;
       this.autoUpdater.allowDowngrade = false;
       this.autoUpdater.autoDownload = false;
       this.autoUpdater.autoInstallOnAppQuit = false;
-      this.autoUpdater.logger = this.logger;
 
       this.updateDetailsJSON = path.join(
         app.getPath('appData'),
