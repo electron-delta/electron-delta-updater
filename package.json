@@ -6,10 +6,6 @@
   "scripts": {
     "test": "electron splash-test/main.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/electron-delta/electron-delta-updater.git"
-  },
   "keywords": [
     "electron-delta-updater",
     "electron-delta",
