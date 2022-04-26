@@ -118,7 +118,16 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  checkForUpdates() {
+  async checkForUpdates() {
+    this.logger.log('[Updater] Checking for updates...');
+    if (this.updateConfig.provider === 'github') {
+      // special case for github, we need to get the latest release as delta.json is
+      // hosted at the root of the new release eg:
+      // https://github.com/${owner}/${repo}/releases/download/${latestReleaseTagName}/delta.json
+
+      this.hostURL = await getGithubFeedURL(this.updateConfig);
+    }
+
     this.autoUpdater.checkForUpdates();
   }
 
