@@ -2,6 +2,8 @@
 
 Delta AutoUpdater module for @electron-delta/builder
 
+![Delta updates](https://electrondelta.com/assets/delta-downloading.png)
+
 ## Features
 
 1. Discord like splash screen auto updater while booting the app
