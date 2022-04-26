@@ -74,15 +74,20 @@ class DeltaUpdater extends EventEmitter {
     if (!this.updateConfig) { return null; }
 
     let hostURL = null;
-    switch (this.updateConfig.provider) {
-      case 'github':
-        hostURL = await getGithubFeedURL(this.updateConfig);
-        break;
-      case 'generic':
-        hostURL = await getGenericFeedURL(this.updateConfig);
-        break;
-      default:
-        hostURL = await this.computeHostURL();
+    try {
+      switch (this.updateConfig.provider) {
+        case 'github':
+          hostURL = await getGithubFeedURL(this.updateConfig);
+          break;
+        case 'generic':
+          hostURL = await getGenericFeedURL(this.updateConfig);
+          break;
+        default:
+          hostURL = await this.computeHostURL();
+      }
+    } catch (e) { this.logger.error('[Updater] Guess host url error ', e); }
+    if (!hostURL) {
+      return null;
     }
     hostURL = newBaseUrl(hostURL);
     return hostURL;
@@ -127,7 +132,7 @@ class DeltaUpdater extends EventEmitter {
 
       getGithubFeedURL(this.updateConfig).then((hostURL) => {
         this.logger.log('[Updater] github hostURL = ', hostURL);
-        this.hostURL = hostURL;
+        this.hostURL = newBaseUrl(hostURL);
         this.autoUpdater.checkForUpdates();
       });
     } else {
