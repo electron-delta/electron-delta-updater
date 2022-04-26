@@ -70,7 +70,7 @@
         case 'download-progress':
           const { percentage, transferred, total } = payload;
           progressBar.value = percentage;
-          statusDom.textContent = `${percentage}% | ${transferred} / ${total}`;
+          statusDom.textContent = `Downloading ${percentage}% | ${transferred} / ${total}`;
           break;
         case 'update-downloaded':
           statusDom.textContent = "Installing...";

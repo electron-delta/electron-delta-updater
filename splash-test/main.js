@@ -2,9 +2,9 @@ const { app } = require('electron');
 const path = require('path');
 const os = require('os');
 const { getWindow, getStartURL, dispatchEvent } = require('../src/splash');
-const { downloadFile } = require('../src/download');
+const { downloadFile, niceBytes } = require('../src/download');
 
-const downloadURL = 'https://github.com/electron-delta/electron-sample-app/releases/download/v0.0.61/electron-sample-app-0.0.61.exe';
+const downloadURL = 'https://github.com/electron-delta/electron-sample-app/releases/download/v0.0.86/electron-sample-app-0.0.84-to-0.0.86-delta.exe';
 
 let updaterWindow;
 app.on('ready', () => {
@@ -24,8 +24,13 @@ app.on('ready', () => {
   setTimeout(async () => {
     await downloadFile(downloadURL, path.join(os.tmpdir(), `${Math.random()}.zip`), ({ percentage, transferred, total }) => {
       console.log(`downloading ${(transferred)}/${(total)} (${percentage}%)`);
-      dispatchEvent(updaterWindow, 'download-progress', { percentage, transferred, total });
+      dispatchEvent(updaterWindow, 'download-progress', {
+        percentage: parseFloat(percentage).toFixed(1),
+        transferred: niceBytes(transferred),
+        total: niceBytes(total),
+      });
     });
+
     console.log('download complete');
     dispatchEvent(updaterWindow, 'update-downloaded');
   }, 3000);
