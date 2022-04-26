@@ -118,17 +118,21 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  async checkForUpdates() {
+  checkForUpdates() {
     this.logger.log('[Updater] Checking for updates...');
     if (this.updateConfig.provider === 'github') {
       // special case for github, we need to get the latest release as delta.json is
       // hosted at the root of the new release eg:
       // https://github.com/${owner}/${repo}/releases/download/${latestReleaseTagName}/delta.json
 
-      this.hostURL = await getGithubFeedURL(this.updateConfig);
+      getGithubFeedURL(this.updateConfig).then((hostURL) => {
+        this.logger.log('[Updater] github hostURL = ', hostURL);
+        this.hostURL = hostURL;
+        this.checkForUpdates();
+      });
+    } else {
+      this.autoUpdater.checkForUpdates();
     }
-
-    this.autoUpdater.checkForUpdates();
   }
 
   pollForUpdates() {
@@ -350,6 +354,7 @@ class DeltaUpdater extends EventEmitter {
     const deltaJSONUrl = this.getDeltaJSONUrl();
     let deltaJSON = null;
     try {
+      this.logger.info(`[Updater] Fetching delta JSON from ${deltaJSONUrl}`);
       const response = await fetch(deltaJSONUrl);
       if (response.status !== 200) {
         this.logger.error(
