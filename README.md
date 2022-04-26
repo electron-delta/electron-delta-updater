@@ -1,20 +1,19 @@
 # @electron-delta/updater
 
-Delta AutoUpdater module for @electron-delta/builder
-
-![Delta updates](https://electrondelta.com/assets/delta-downloading.png)
+### Delta AutoUpdater module for [`@electron-delta/builder`](https://github.com/electron-delta/electron-delta)
 
 ## Features
 
 1. Discord like splash screen auto updater while booting the app
 2. Works with [`@electron-delta/builder`](https://github.com/electron-delta/electron-delta), automatically uses delta updates for Windows NSIS
 3. sha256 checksum for delta updates
+
+![Delta updates](https://electrondelta.com/assets/delta-downloading.png)
 ## Installation
 
 ```bash
 npm install @electron-delta/updater
 ```
-
 ## Example
 
 ```js
