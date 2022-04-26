@@ -17,7 +17,7 @@ const { newBaseUrl, newUrlFromBase } = require('./utils');
 
 const { getStartURL, getWindow, dispatchEvent } = require('./splash');
 
-const { app, BrowserWindow } = electron;
+const { app, BrowserWindow, Notification } = electron;
 const oneMinute = 60 * 1000;
 const fifteenMinutes = 15 * oneMinute;
 
@@ -293,12 +293,17 @@ class DeltaUpdater extends EventEmitter {
     });
   }
 
-  async handleUpdateDownloaded(info) {
-    this.autoUpdateInfo = info;
+  quitAndInstall() {
+    this.logger.info('[Updater] Quit and Install');
 
-    this.logger.info('[Updater] Triggering update');
+    if (!this.autoUpdateInfo) {
+      this.logger.info('[Updater] No update available');
+      return;
+    }
+
     setTimeout(async () => {
       if (this.autoUpdateInfo.delta) {
+        this.logger.info('[Updater] Applying delta update');
         await this.applyDeltaUpdate(
           this.autoUpdateInfo.deltaPath,
           this.autoUpdateInfo.version,
@@ -310,10 +315,32 @@ class DeltaUpdater extends EventEmitter {
     }, 0);
   }
 
+  async handleUpdateDownloaded(info) {
+    this.autoUpdateInfo = info; // important to save this info for later
+    if (this.updaterWindow) {
+      this.logger.info('[Updater] Triggering update');
+      this.quitAndInstall();
+    } else {
+      this.logger.info('[Updater] No splash window found. Show notification only.');
+      this.showUpdateNotification(this.autoUpdateInfo);
+    }
+  }
+
+  showUpdateNotification(info) {
+    const notification = new Notification({
+      title: `${getAppName()} ${info.version} is available and will be installed on exit.`,
+      body: 'Click to apply update now.',
+      silent: true,
+    });
+    notification.show();
+    notification.on('click', () => {
+      this.quitAndInstall();
+    });
+  }
+
   async boot() {
-    if (process.platform === 'darwin') return Promise.resolve();
     this.logger.info('[Updater] Booting');
-    if (!this.hostURL) {
+    if (!this.hostURL && process.platform === 'win32') {
       this.hostURL = await this.guessHostURL();
     }
     const startURL = getStartURL();
@@ -325,6 +352,7 @@ class DeltaUpdater extends EventEmitter {
     await new Promise((resolve) => {
       setTimeout(() => {
         this.updaterWindow.close();
+        this.updaterWindow = null;
         resolve();
       }, 300);
     });
