@@ -128,7 +128,7 @@ class DeltaUpdater extends EventEmitter {
       getGithubFeedURL(this.updateConfig).then((hostURL) => {
         this.logger.log('[Updater] github hostURL = ', hostURL);
         this.hostURL = hostURL;
-        this.checkForUpdates();
+        this.autoUpdater.checkForUpdates();
       });
     } else {
       this.autoUpdater.checkForUpdates();
