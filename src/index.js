@@ -200,10 +200,10 @@ class DeltaUpdater extends EventEmitter {
   }
 
   attachListeners(resolve, reject) {
-    if (!app.isPackaged) {
-      resolve();
-      return;
-    }
+    // if (!app.isPackaged) {
+    //   resolve();
+    //   return;
+    // }
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
@@ -342,12 +342,17 @@ class DeltaUpdater extends EventEmitter {
     if (!this.hostURL && process.platform === 'win32') {
       this.hostURL = await this.guessHostURL();
     }
-    const startURL = getStartURL();
-    await new Promise((resolve, reject) => {
-      this.createSplashWindow();
-      this.updaterWindow.loadURL(startURL);
-      this.attachListeners(resolve, reject);
-    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        const startURL = getStartURL();
+        this.createSplashWindow();
+        this.updaterWindow.loadURL(startURL);
+        this.attachListeners(resolve, reject);
+      });
+    } catch (e) {
+      this.logger.error('[Updater] Boot error ', e);
+    }
     await new Promise((resolve) => {
       setTimeout(() => {
         this.updaterWindow.close();
@@ -429,7 +434,7 @@ class DeltaUpdater extends EventEmitter {
     const deltaPath = path.join(this.deltaHolderPath, deltaDetails.path);
 
     if (fs.existsSync(deltaPath) && isSHACorrect(deltaPath, shaVal)) {
-    // cached downloaded file is good to go
+      // cached downloaded file is good to go
       this.logger.info('[Updater] Delta file is already present ', deltaPath);
       deltaDownloaded(deltaPath);
       return;
