@@ -21,6 +21,9 @@ const { app, BrowserWindow, Notification } = electron;
 const oneMinute = 60 * 1000;
 const fifteenMinutes = 15 * oneMinute;
 
+const macUpdaterPath = path.join(__dirname, './mac-updater/build/mac-updater');
+const hpatchzPath = path.join(__dirname, './mac-updater/build/hpatchz');
+
 const getChannel = () => {
   const version = app.getVersion();
   const preRelease = semver.prerelease(version);
@@ -105,29 +108,33 @@ class DeltaUpdater extends EventEmitter {
     this.logger.info('[Updater]  CHANNEL = ', channel);
     this.autoUpdater.channel = channel;
     this.autoUpdater.logger = this.logger;
-    if (process.platform === 'win32') {
-      this.autoUpdater.allowDowngrade = false;
-      this.autoUpdater.autoDownload = false;
-      this.autoUpdater.autoInstallOnAppQuit = false;
 
-      this.updateDetailsJSON = path.join(
-        app.getPath('appData'),
-        `../Local/${this.updateConfig.updaterCacheDirName}/update-details.json`,
-      );
+    this.autoUpdater.allowDowngrade = false;
+    this.autoUpdater.autoDownload = false;
+    this.autoUpdater.autoInstallOnAppQuit = false;
 
-      this.deltaHolderPath = path.join(
-        app.getPath('appData'),
-        `../Local/${this.updateConfig.updaterCacheDirName}/deltas`,
-      );
+    this.deltaUpdaterRootPath = path.join(
+      app.getPath('appData'),
+      `../Local/${this.updateConfig.updaterCacheDirName}`,
+    );
+
+    this.updateDetailsJSON = path.join(this.deltaUpdaterRootPath, './update-details.json');
+    this.deltaHolderPath = path.join(this.deltaUpdaterRootPath, './deltas');
+
+    if (app.isPackaged && process.platform === 'darwin') {
+      this.macUpdaterPath = path.join(this.deltaUpdaterRootPath, 'mac-updater');
+      this.hpatchzPath = path.join(this.deltaUpdaterRootPath, 'hpatchz');
+      fs.copyFileSync(macUpdaterPath, this.macUpdaterPath);
+      fs.copyFileSync(hpatchzPath, this.hpatchzPath);
     }
   }
 
   checkForUpdates() {
     this.logger.log('[Updater] Checking for updates...');
     if (this.updateConfig.provider === 'github') {
-      // special case for github, we need to get the latest release as delta.json is
+      // special case for github, we need to get the latest release as delta-win/mac.json is
       // hosted at the root of the new release eg:
-      // https://github.com/${owner}/${repo}/releases/download/${latestReleaseTagName}/delta.json
+      // https://github.com/${owner}/${repo}/releases/download/${latestReleaseTagName}/delta-{win/mac}.json
 
       getGithubFeedURL(this.updateConfig).then((hostURL) => {
         this.logger.log('[Updater] github hostURL = ', hostURL);
@@ -225,8 +232,6 @@ class DeltaUpdater extends EventEmitter {
       this.logger.info('[Updater] Update available ', info);
       this.emit('update-available', info);
       dispatchEvent(this.updaterWindow, 'update-available', info);
-      // For MacOS, update is downloaded automatically
-      if (process.platform === 'darwin') return;
 
       const updateDetails = await this.getAutoUpdateDetails();
       if (updateDetails) {
@@ -355,8 +360,10 @@ class DeltaUpdater extends EventEmitter {
     }
     await new Promise((resolve) => {
       setTimeout(() => {
-        this.updaterWindow.close();
-        this.updaterWindow = null;
+        if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+          this.updaterWindow.close();
+          this.updaterWindow = null;
+        }
         resolve();
       }, 300);
     });
@@ -368,7 +375,8 @@ class DeltaUpdater extends EventEmitter {
   }
 
   getDeltaJSONUrl() {
-    return newUrlFromBase('delta.json', this.hostURL);
+    const jsonFileName = process.platform === 'win32' ? 'delta-win.json' : 'delta-mac.json';
+    return newUrlFromBase(jsonFileName, this.hostURL);
   }
 
   async doSmartDownload({ version, releaseDate }) {
@@ -487,11 +495,24 @@ class DeltaUpdater extends EventEmitter {
     this.logger.info('[Updater] Applying delta update');
     await this.writeAutoUpdateDetails({ isDelta: true, attemptedVersion: version });
     this.ensureSafeQuitAndInstall();
+
     try {
-      spawnSync(deltaPath, {
-        detached: true,
-        stdio: 'ignore',
-      });
+      if (process.platform === 'darwin') {
+        this.logger.info('[Updater] Applying delta update on macOS ', this.macUpdaterPath, this.hpatchzPath);
+        spawnSync(this.macUpdaterPath, [
+          getAppName(),
+          deltaPath,
+          this.hpatchzPath,
+        ], {
+          detached: true,
+          stdio: 'inherit',
+        });
+      } else {
+        spawnSync(deltaPath, {
+          detached: true,
+          stdio: 'ignore',
+        });
+      }
       app.isQuitting = true;
       app.quit();
     } catch (err) {
