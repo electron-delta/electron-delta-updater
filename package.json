@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "electron splash-test/main.js",
-    "cargo": "cd src/mac-updater && cargo run"
+    "cargo": "cd src/mac-updater && cargo build"
   },
   "keywords": [
     "electron-delta-updater",

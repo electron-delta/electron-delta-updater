@@ -124,8 +124,13 @@ class DeltaUpdater extends EventEmitter {
     if (app.isPackaged && process.platform === 'darwin') {
       this.macUpdaterPath = path.join(this.deltaUpdaterRootPath, 'mac-updater');
       this.hpatchzPath = path.join(this.deltaUpdaterRootPath, 'hpatchz');
-      fs.copyFileSync(macUpdaterPath, this.macUpdaterPath);
-      fs.copyFileSync(hpatchzPath, this.hpatchzPath);
+      // https://developer.apple.com/forums/thread/130313?answerId=410704022#410704022
+      fs.moveSync(macUpdaterPath, this.macUpdaterPath, {
+        overwrite: true,
+      });
+      fs.moveSync(hpatchzPath, this.hpatchzPath, {
+        overwrite: true,
+      });
     }
   }
 
@@ -357,18 +362,24 @@ class DeltaUpdater extends EventEmitter {
       });
     } catch (e) {
       this.logger.error('[Updater] Boot error ', e);
+      if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+        this.updaterWindow.close();
+        this.updaterWindow = null;
+      }
     }
-    await new Promise((resolve) => {
-      setTimeout(() => {
-        if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
-          this.updaterWindow.close();
-          this.updaterWindow = null;
-          resolve();
-        } else {
-          resolve();
-        }
-      }, 300);
-    });
+    if (this.updaterWindow) {
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+            this.updaterWindow.close();
+            this.updaterWindow = null;
+            resolve();
+          } else {
+            resolve();
+          }
+        }, 300);
+      });
+    }
     return Promise.resolve();
   }
 

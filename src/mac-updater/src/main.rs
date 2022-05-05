@@ -1,6 +1,7 @@
 use std::env;
 use std::path::Path;
 use std::process::Command;
+use std::{thread, time::Duration};
 
 fn kill_process(name: &str) {
   let output = Command::new("killall")
@@ -52,6 +53,7 @@ fn main() {
 
       kill_process(app_name);
       hpatchz_app(hpatchz_path, delta_path, app_name);
+      thread::sleep(Duration::from_secs(1));
       open_app(app_name);
     }
     _ => help(),
