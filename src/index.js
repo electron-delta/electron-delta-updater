@@ -363,8 +363,10 @@ class DeltaUpdater extends EventEmitter {
         if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
           this.updaterWindow.close();
           this.updaterWindow = null;
+          resolve();
+        } else {
+          resolve();
         }
-        resolve();
       }, 300);
     });
     return Promise.resolve();
