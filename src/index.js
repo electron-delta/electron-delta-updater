@@ -149,6 +149,7 @@ class DeltaUpdater extends EventEmitter {
       .catch((err) => {
         // when update check fails the updaterWindow needs to be close, loads the app's current version.
         this.logger.error(`[Updater] check for updates failed.`);
+        dispatchEvent(this.updaterWindow, 'error', error);
         this.updaterWindow.close();
         this.updaterWindow = null;
       });
