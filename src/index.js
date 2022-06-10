@@ -145,6 +145,12 @@ class DeltaUpdater extends EventEmitter {
         this.logger.log('[Updater] github hostURL = ', hostURL);
         this.hostURL = newBaseUrl(hostURL);
         this.autoUpdater.checkForUpdates();
+      })
+      .catch((err) => {
+        // when update check fails the updaterWindow needs to be close, loads the app's current version.
+        this.logger.error(`[Updater] check for updates failed.`);
+        this.updaterWindow.close();
+        this.updaterWindow = null;
       });
     } else {
       this.autoUpdater.checkForUpdates();
