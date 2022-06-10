@@ -134,7 +134,7 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  checkForUpdates() {
+  checkForUpdates(resolve, reject) {
     this.logger.log('[Updater] Checking for updates...');
     if (this.updateConfig.provider === 'github') {
       // special case for github, we need to get the latest release as delta-win/mac.json is
@@ -149,19 +149,18 @@ class DeltaUpdater extends EventEmitter {
       .catch((err) => {
         // when update check fails the updaterWindow needs to be close, loads the app's current version.
         this.logger.error(`[Updater] check for updates failed.`);
-        dispatchEvent(this.updaterWindow, 'error', error);
-        this.updaterWindow.close();
-        this.updaterWindow = null;
+        dispatchEvent(this.updaterWindow, 'error', err);
+        reject(err);
       });
     } else {
       this.autoUpdater.checkForUpdates();
     }
   }
 
-  pollForUpdates() {
-    this.checkForUpdates();
+  pollForUpdates(resolve, reject) {
+    this.checkForUpdates(resolve, reject);
     setInterval(() => {
-      this.checkForUpdates();
+      this.checkForUpdates(resolve, reject);
     }, fifteenMinutes);
   }
 
@@ -224,7 +223,7 @@ class DeltaUpdater extends EventEmitter {
     //   return;
     // }
     this.autoUpdater.removeAllListeners();
-    this.pollForUpdates();
+    this.pollForUpdates(resolve, reject);
 
     this.logger.log('[Updater] Attaching listeners');
 
