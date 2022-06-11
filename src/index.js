@@ -21,8 +21,8 @@ const { app, BrowserWindow, Notification } = electron;
 const oneMinute = 60 * 1000;
 const fifteenMinutes = 15 * oneMinute;
 
-const macUpdaterPath = path.join(__dirname, './mac-updater/build/mac-updater');
-const hpatchzPath = path.join(__dirname, './mac-updater/build/hpatchz');
+const macUpdaterURL = 'http://localhost:3000/mac-updater';
+const hpatchzURL = 'http://localhost:3000/hpatchz';
 
 const getChannel = () => {
   const version = app.getVersion();
@@ -101,7 +101,7 @@ class DeltaUpdater extends EventEmitter {
     return provider.baseUrl.href;
   }
 
-  prepareUpdater() {
+  async prepareUpdater() {
     const channel = getChannel();
     if (!channel) return;
 
@@ -122,21 +122,18 @@ class DeltaUpdater extends EventEmitter {
     this.deltaHolderPath = path.join(this.deltaUpdaterRootPath, './deltas');
 
     if (app.isPackaged && process.platform === 'darwin') {
-      this.macUpdaterPath = path.join(this.deltaUpdaterRootPath, 'mac-updater');
-      this.hpatchzPath = path.join(this.deltaUpdaterRootPath, 'hpatchz');
-      // https://developer.apple.com/forums/thread/130313?answerId=410704022#410704022
-      fs.moveSync(macUpdaterPath, this.macUpdaterPath, {
-        overwrite: true,
-      });
-      fs.moveSync(hpatchzPath, this.hpatchzPath, {
-        overwrite: true,
-      });
+      this.macUpdaterPath = path.join(this.deltaUpdaterRootPath, './mac-updater');
+      this.hpatchzPath = path.join(this.deltaUpdaterRootPath, './hpatchz');
+      await downloadFile(macUpdaterURL, this.macUpdaterPath);
+      await downloadFile(hpatchzURL, this.hpatchzPath);
+      fs.chmodSync(this.macUpdaterPath, '755');
+      fs.chmodSync(this.hpatchzPath, '755');
     }
   }
 
   checkForUpdates() {
     this.logger.log('[Updater] Checking for updates...');
-    if (this.updateConfig.provider === 'github') {
+    if (this.updateConfig && this.updateConfig.provider === 'github') {
       // special case for github, we need to get the latest release as delta-win/mac.json is
       // hosted at the root of the new release eg:
       // https://github.com/${owner}/${repo}/releases/download/${latestReleaseTagName}/delta-{win/mac}.json
@@ -212,10 +209,12 @@ class DeltaUpdater extends EventEmitter {
   }
 
   attachListeners(resolve, reject) {
-    // if (!app.isPackaged) {
-    //   resolve();
-    //   return;
-    // }
+    if (!app.isPackaged) {
+      setTimeout(() => {
+        resolve();
+      }, 1000);
+      return;
+    }
     this.autoUpdater.removeAllListeners();
     this.pollForUpdates();
 
@@ -297,8 +296,7 @@ class DeltaUpdater extends EventEmitter {
       this.logger.info('[Updater] Update downloaded ', info);
       this.emit('update-downloaded', info);
       dispatchEvent(this.updaterWindow, 'update-downloaded', info);
-      this.handleUpdateDownloaded(info);
-      resolve();
+      this.handleUpdateDownloaded(info, resolve);
     });
   }
 
@@ -324,10 +322,11 @@ class DeltaUpdater extends EventEmitter {
     }, 0);
   }
 
-  async handleUpdateDownloaded(info) {
+  async handleUpdateDownloaded(info, resolve) {
     this.autoUpdateInfo = info; // important to save this info for later
     if (this.updaterWindow) {
       this.logger.info('[Updater] Triggering update');
+      resolve();
       this.quitAndInstall();
     } else {
       this.logger.info('[Updater] No splash window found. Show notification only.');
@@ -347,40 +346,37 @@ class DeltaUpdater extends EventEmitter {
     });
   }
 
-  async boot() {
+  async boot({
+    splashScreen,
+  }) {
     this.logger.info('[Updater] Booting');
     if (!this.hostURL && process.platform === 'win32') {
       this.hostURL = await this.guessHostURL();
     }
 
-    try {
-      await new Promise((resolve, reject) => {
-        const startURL = getStartURL();
-        this.createSplashWindow();
-        this.updaterWindow.loadURL(startURL);
-        this.attachListeners(resolve, reject);
-      });
-    } catch (e) {
-      this.logger.error('[Updater] Boot error ', e);
-      if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+    if (splashScreen) {
+      const startURL = getStartURL();
+      this.createSplashWindow();
+      this.updaterWindow.loadURL(startURL);
+    }
+    return new Promise((resolve, reject) => {
+      this.attachListeners(resolve, reject);
+      if (!splashScreen) {
+        resolve();
+      }
+    }).then(() => {
+      this.logger.info('[Updater] Booted');
+      if (splashScreen && this.updaterWindow && !this.updaterWindow.isDestroyed()) {
         this.updaterWindow.close();
         this.updaterWindow = null;
       }
-    }
-    if (this.updaterWindow) {
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          if (this.updaterWindow && !this.updaterWindow.isDestroyed()) {
-            this.updaterWindow.close();
-            this.updaterWindow = null;
-            resolve();
-          } else {
-            resolve();
-          }
-        }, 300);
-      });
-    }
-    return Promise.resolve();
+    }).catch((err) => {
+      this.logger.error('[Updater] Boot error ', err);
+      if (splashScreen && this.updaterWindow && !this.updaterWindow.isDestroyed()) {
+        this.updaterWindow.close();
+        this.updaterWindow = null;
+      }
+    });
   }
 
   getDeltaURL({ deltaPath }) {
@@ -511,14 +507,20 @@ class DeltaUpdater extends EventEmitter {
 
     try {
       if (process.platform === 'darwin') {
-        this.logger.info('[Updater] Applying delta update on macOS ', this.macUpdaterPath, this.hpatchzPath);
+        this.logger.info(
+          '[Updater] Applying delta update on macOS ',
+          this.macUpdaterPath,
+          getAppName(),
+          deltaPath,
+          this.hpatchzPath,
+        );
         spawnSync(this.macUpdaterPath, [
           getAppName(),
           deltaPath,
           this.hpatchzPath,
         ], {
           detached: true,
-          stdio: 'inherit',
+          stdio: 'ignore',
         });
       } else {
         spawnSync(deltaPath, {
