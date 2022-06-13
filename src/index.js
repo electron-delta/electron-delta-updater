@@ -146,12 +146,12 @@ class DeltaUpdater extends EventEmitter {
         this.hostURL = newBaseUrl(hostURL);
         this.autoUpdater.checkForUpdates();
       })
-      .catch((err) => {
-        // when update check fails the updaterWindow needs to be close, loads the app's current version.
-        this.logger.error(`[Updater] check for updates failed.`);
-        dispatchEvent(this.updaterWindow, 'error', err);
-        reject(err);
-      });
+        .catch((err) => {
+          // when update check fails the updaterWindow needs to be close, loads the app's current version.
+          this.logger.error('[Updater] check for updates failed.');
+          dispatchEvent(this.updaterWindow, 'error', err);
+          reject(err);
+        });
     } else {
       this.autoUpdater.checkForUpdates();
     }
@@ -277,7 +277,8 @@ class DeltaUpdater extends EventEmitter {
         this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
         if (this.autoUpdateInfo.delta) {
           try {
-            spawnSync(this.autoUpdateInfo.deltaPath, ['-norestart'], {
+            console.log(this.autoUpdateInfo.deltaPath, [`-appPath="${app.getAppPath()}"`], ['-norestart=1']);
+            spawnSync(this.autoUpdateInfo.deltaPath, [`-appPath="${app.getAppPath()}"`], ['-norestart=1'], {
               detached: true,
               stdio: 'ignore',
             });
@@ -527,7 +528,9 @@ class DeltaUpdater extends EventEmitter {
           stdio: 'inherit',
         });
       } else {
-        spawnSync(deltaPath, {
+        console.log(deltaPath, [`-appPath="${app.getAppPath()}"`], ['-norestart=1']);
+
+        spawnSync(deltaPath, [`-appPath="${app.getAppPath()}"`], {
           detached: true,
           stdio: 'ignore',
         });
