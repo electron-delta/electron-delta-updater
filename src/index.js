@@ -65,6 +65,9 @@ class DeltaUpdater extends EventEmitter {
     if (app.isPackaged) {
       this.setConfigPath();
       this.prepareUpdater();
+      this.appPath = path.dirname(app.getPath('exe'));
+      this.appName = getAppName();
+      this.logger.info('[Updater] App path = ', this.appPath);
     }
   }
 
@@ -131,7 +134,7 @@ class DeltaUpdater extends EventEmitter {
     }
   }
 
-  checkForUpdates() {
+  checkForUpdates(resolve, reject) {
     this.logger.log('[Updater] Checking for updates...');
     if (this.updateConfig && this.updateConfig.provider === 'github') {
       // special case for github, we need to get the latest release as delta-win/mac.json is
@@ -142,16 +145,22 @@ class DeltaUpdater extends EventEmitter {
         this.logger.log('[Updater] github hostURL = ', hostURL);
         this.hostURL = newBaseUrl(hostURL);
         this.autoUpdater.checkForUpdates();
-      });
+      })
+        .catch((err) => {
+          // when update check fails the updaterWindow needs to be close, loads the app's current version.
+          this.logger.error('[Updater] check for updates failed.');
+          dispatchEvent(this.updaterWindow, 'error', err);
+          reject(err);
+        });
     } else {
       this.autoUpdater.checkForUpdates();
     }
   }
 
-  pollForUpdates() {
-    this.checkForUpdates();
+  pollForUpdates(resolve, reject) {
+    this.checkForUpdates(resolve, reject);
     setInterval(() => {
-      this.checkForUpdates();
+      this.checkForUpdates(resolve, reject);
     }, fifteenMinutes);
   }
 
@@ -216,7 +225,7 @@ class DeltaUpdater extends EventEmitter {
       return;
     }
     this.autoUpdater.removeAllListeners();
-    this.pollForUpdates();
+    this.pollForUpdates(resolve, reject);
 
     this.logger.log('[Updater] Attaching listeners');
 
@@ -270,7 +279,8 @@ class DeltaUpdater extends EventEmitter {
         this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
         if (this.autoUpdateInfo.delta) {
           try {
-            spawnSync(this.autoUpdateInfo.deltaPath, ['-norestart'], {
+            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1']);
+            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1'], {
               detached: true,
               stdio: 'ignore',
             });
@@ -523,7 +533,9 @@ class DeltaUpdater extends EventEmitter {
           stdio: 'ignore',
         });
       } else {
-        spawnSync(deltaPath, {
+        this.logger.log(deltaPath, [`/appPath=${this.appPath}`]);
+
+        spawnSync(deltaPath, [`/appPath=${this.appPath}`], {
           detached: true,
           stdio: 'ignore',
         });
