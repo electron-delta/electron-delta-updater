@@ -65,6 +65,9 @@ class DeltaUpdater extends EventEmitter {
     if (app.isPackaged) {
       this.setConfigPath();
       this.prepareUpdater();
+      this.appPath = path.dirname(app.getPath('exe'));
+      this.appName = getAppName();
+      this.logger.info('[Updater] App path = ', this.appPath);
     }
   }
 
@@ -277,8 +280,8 @@ class DeltaUpdater extends EventEmitter {
         this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
         if (this.autoUpdateInfo.delta) {
           try {
-            console.log(this.autoUpdateInfo.deltaPath, [`/appPath="${app.getAppPath()}"`], ['/norestart=1']);
-            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath="${app.getAppPath()}"`], ['/norestart=1'], {
+            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath="${this.appPath}"`], ['/norestart=1']);
+            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath="${this.appPath}"`], ['/norestart=1'], {
               detached: true,
               stdio: 'ignore',
             });
@@ -528,9 +531,9 @@ class DeltaUpdater extends EventEmitter {
           stdio: 'inherit',
         });
       } else {
-        this.logger.log(deltaPath, [`/appPath="${app.getAppPath()}"`], ['/norestart=1']);
+        this.logger.log(deltaPath, [`/appPath="${this.appPath}"`]);
 
-        spawnSync(deltaPath, [`/appPath="${app.getAppPath()}"`], {
+        spawnSync(deltaPath, [`/appPath="${this.appPath}"`], {
           detached: true,
           stdio: 'ignore',
         });
