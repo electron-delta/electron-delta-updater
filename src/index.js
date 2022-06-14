@@ -280,8 +280,8 @@ class DeltaUpdater extends EventEmitter {
         this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
         if (this.autoUpdateInfo.delta) {
           try {
-            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath="${this.appPath}"`], ['/norestart=1']);
-            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath="${this.appPath}"`], ['/norestart=1'], {
+            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1']);
+            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1'], {
               detached: true,
               stdio: 'ignore',
             });
@@ -531,9 +531,9 @@ class DeltaUpdater extends EventEmitter {
           stdio: 'inherit',
         });
       } else {
-        this.logger.log(deltaPath, [`/appPath="${this.appPath}"`]);
+        this.logger.log(deltaPath, [`/appPath=${this.appPath}`]);
 
-        spawnSync(deltaPath, [`/appPath="${this.appPath}"`], {
+        spawnSync(deltaPath, [`/appPath=${this.appPath}`], {
           detached: true,
           stdio: 'ignore',
         });
