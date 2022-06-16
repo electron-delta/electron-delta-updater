@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const fetch = require('cross-fetch');
 const semver = require('semver');
-const { spawnSync } = require('child_process');
+const { spawnSync, execFile } = require('child_process');
 const yaml = require('yaml');
 
 const { downloadFile, niceBytes } = require('./download');
@@ -20,9 +20,6 @@ const { getStartURL, getWindow, dispatchEvent } = require('./splash');
 const { app, BrowserWindow, Notification } = electron;
 const oneMinute = 60 * 1000;
 const fifteenMinutes = 15 * oneMinute;
-
-const macUpdaterURL = 'http://localhost:3000/mac-updater';
-const hpatchzURL = 'http://localhost:3000/hpatchz';
 
 const getChannel = () => {
   const version = app.getVersion();
@@ -127,10 +124,6 @@ class DeltaUpdater extends EventEmitter {
     if (app.isPackaged && process.platform === 'darwin') {
       this.macUpdaterPath = path.join(this.deltaUpdaterRootPath, './mac-updater');
       this.hpatchzPath = path.join(this.deltaUpdaterRootPath, './hpatchz');
-      await downloadFile(macUpdaterURL, this.macUpdaterPath);
-      await downloadFile(hpatchzURL, this.hpatchzPath);
-      fs.chmodSync(this.macUpdaterPath, '755');
-      fs.chmodSync(this.hpatchzPath, '755');
     }
   }
 
@@ -147,7 +140,8 @@ class DeltaUpdater extends EventEmitter {
         this.autoUpdater.checkForUpdates();
       })
         .catch((err) => {
-          // when update check fails the updaterWindow needs to be close, loads the app's current version.
+          // when update check fails the updaterWindow needs to be close,
+          // loads the app's current version.
           this.logger.error('[Updater] check for updates failed.');
           dispatchEvent(this.updaterWindow, 'error', err);
           reject(err);
@@ -274,26 +268,7 @@ class DeltaUpdater extends EventEmitter {
 
     this.logger.info('[Updater] Added on quit listener');
 
-    app.on('quit', async (event, exitCode) => {
-      if (this.autoUpdateInfo) {
-        this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
-        if (this.autoUpdateInfo.delta) {
-          try {
-            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1']);
-            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`], ['/norestart=1'], {
-              detached: true,
-              stdio: 'ignore',
-            });
-          } catch (err) {
-            this.logger.error('[Updater] Spawn error ', err);
-          }
-        } else {
-          await this.applyUpdate(this.autoUpdateInfo.version, false);
-        }
-      } else {
-        this.logger.info('[Updater] Quitting now. No update available');
-      }
-    });
+    app.on('quit', this.onQuit);
 
     this.autoUpdater.on('update-not-available', () => {
       this.logger.info('[Updater] Update not available');
@@ -308,6 +283,44 @@ class DeltaUpdater extends EventEmitter {
       dispatchEvent(this.updaterWindow, 'update-downloaded', info);
       this.handleUpdateDownloaded(info, resolve);
     });
+  }
+
+  async onQuit(event, exitCode) {
+    this.logger.info('[Updater] onQuit');
+    if (this.autoUpdateInfo) {
+      this.logger.info('[Updater] On Quit ', this.autoUpdateInfo);
+      if (this.autoUpdateInfo.delta) {
+        if (process.platform === 'win32') {
+          try {
+            this.logger.log(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`, '/norestart=1']);
+            spawnSync(this.autoUpdateInfo.deltaPath, [`/appPath=${this.appPath}`, '/norestart=1'], {
+              detached: true,
+              stdio: 'ignore',
+            });
+          } catch (err) {
+            this.logger.error('[Updater] Spawn error ', err);
+          }
+        }
+
+        if (process.platform === 'darwin') {
+          const command = `${this.macUpdaterPath} ${getAppName()} ${this.autoUpdateInfo.deltaPath} ${this.hpatchzPath}`;
+          this.logger.info(
+            '[Updater] Applying delta update on macOS on Quit ',
+            command,
+          );
+
+          execFile(this.macUpdaterPath, [
+            getAppName(),
+            this.autoUpdateInfo.deltaPath,
+            this.hpatchzPath,
+          ]).unref();
+        }
+      } else {
+        await this.applyUpdate(this.autoUpdateInfo.version, false);
+      }
+    } else {
+      this.logger.info('[Updater] Quitting now. No update available');
+    }
   }
 
   quitAndInstall() {
@@ -458,6 +471,21 @@ class DeltaUpdater extends EventEmitter {
       return;
     }
 
+    try {
+      const macUpdaterURL = newUrlFromBase('mac-updater', this.hostURL);
+      const hpatchzURL = newUrlFromBase('hpatchz', this.hostURL);
+      this.logger.info('[Updater] Downloading mac-updater and hpatchz');
+      this.logger.info(`${macUpdaterURL} and ${hpatchzURL}`);
+      await downloadFile(macUpdaterURL, this.macUpdaterPath);
+      await downloadFile(hpatchzURL, this.hpatchzPath);
+      await fs.chmod(this.macUpdaterPath, '755');
+      await fs.chmod(this.hpatchzPath, '755');
+    } catch (err) {
+      this.logger.error('[Updater] Error downloading updater helper files', err);
+      this.autoUpdater.downloadUpdate();
+      return;
+    }
+
     const deltaPath = path.join(this.deltaHolderPath, deltaDetails.path);
 
     if (fs.existsSync(deltaPath) && isSHACorrect(deltaPath, shaVal)) {
@@ -517,29 +545,24 @@ class DeltaUpdater extends EventEmitter {
 
     try {
       if (process.platform === 'darwin') {
+        const command = `${this.macUpdaterPath} ${getAppName()} ${deltaPath} ${this.hpatchzPath}`;
         this.logger.info(
-          '[Updater] Applying delta update on macOS ',
-          this.macUpdaterPath,
-          getAppName(),
-          deltaPath,
-          this.hpatchzPath,
+          '[Updater] Applying delta update with execFile ',
+          command,
         );
-        spawnSync(this.macUpdaterPath, [
+        execFile(this.macUpdaterPath, [
           getAppName(),
           deltaPath,
           this.hpatchzPath,
-        ], {
-          detached: true,
-          stdio: 'ignore',
-        });
+        ]).unref();
       } else {
         this.logger.log(deltaPath, [`/appPath=${this.appPath}`]);
-
         spawnSync(deltaPath, [`/appPath=${this.appPath}`], {
           detached: true,
           stdio: 'ignore',
         });
       }
+      app.removeListener('quit', this.onQuit);
       app.isQuitting = true;
       app.quit();
     } catch (err) {
